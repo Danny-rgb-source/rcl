@@ -1,0 +1,320 @@
+*** Begin Patch
+*** Add File: RCL.Core/RCL.Core.csproj
++<Project Sdk="Microsoft.NET.Sdk">
++  <PropertyGroup>
++    <TargetFramework>net6.0</TargetFramework>
++    <Nullable>enable</Nullable>
++    <ImplicitUsings>enable</ImplicitUsings>
++    <GenerateDocumentationFile>false</GenerateDocumentationFile>
++  </PropertyGroup>
++</Project>
++
+*** End Patch
+*** Begin Patch
+*** Add File: RCL.Core/Class1.cs
++namespace RCL.Core
++{
++    /// <summary>
++    /// Placeholder class for the RCL.Core project.
++    /// </summary>
++    public class Class1
++    {
++    }
++}
++
+*** End Patch
+*** Begin Patch
+*** Add File: RCL.Core/Models/Business.cs
++using System;
++
++namespace RCL.Core.Models
++{
++    public class Business
++    {
++        public string Id { get; set; } = Guid.NewGuid().ToString();
++        public string Name { get; set; } = string.Empty;
++        public string Address { get; set; } = string.Empty;
++        public string Phone { get; set; } = string.Empty;
++        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
++    }
++}
++
+*** End Patch
+*** Begin Patch
+*** Add File: RCL.Core/Models/Customer.cs
++using System;
++using System.Collections.Generic;
++
++namespace RCL.Core.Models
++{
++    public class Customer
++    {
++        public string Id { get; set; } = Guid.NewGuid().ToString();
++        public string FirstName { get; set; } = string.Empty;
++        public string LastName { get; set; } = string.Empty;
++        public string Email { get; set; } = string.Empty;
++        public string Phone { get; set; } = string.Empty;
++        public int Points { get; set; } = 0;
++        public List<string> Tags { get; set; } = new();
++        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
++        public DateTime? LastVisitAt { get; set; }
++    }
++}
++
+*** End Patch
+*** Begin Patch
+*** Add File: RCL.Core/Models/RewardRule.cs
++using System;
++
++namespace RCL.Core.Models
++{
++    public class RewardRule
++    {
++        public string Id { get; set; } = Guid.NewGuid().ToString();
++        public string Name { get; set; } = string.Empty;
++        public string Description { get; set; } = string.Empty;
++        public int PointsRequired { get; set; }
++        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
++    }
++}
++
+*** End Patch
+*** Begin Patch
+*** Add File: RCL.Core/Models/Visit.cs
++using System;
++
++namespace RCL.Core.Models
++{
++    public class Visit
++    {
++        public string Id { get; set; } = Guid.NewGuid().ToString();
++        public string CustomerId { get; set; } = string.Empty;
++        public string BusinessId { get; set; } = string.Empty;
++        public DateTime VisitAt { get; set; } = DateTime.UtcNow;
++        public decimal Amount { get; set; }
++        public string Notes { get; set; } = string.Empty;
++    }
++}
++
+*** End Patch
+*** Begin Patch
+*** Add File: RCL.Core/Services/LocalDatabaseService.cs
++using System;
++using System.Collections.Concurrent;
++using System.Collections.Generic;
++using System.IO;
++using System.Text.Json;
++using System.Threading;
++using System.Threading.Tasks;
++
++namespace RCL.Core.Services
++{
++    /// <summary>
++    /// Simple JSON file based local database service.
++    /// Stores files under a "data" folder next to the solution root.
++    /// Thread-safe for typical desktop usage.
++    /// </summary>
++    public class LocalDatabaseService
++    {
++        private readonly string _dataFolder;
++        private readonly JsonSerializerOptions _jsonOptions;
++        private readonly SemaphoreSlim _ioLock = new(1, 1);
++
++        public LocalDatabaseService(string? baseFolder = null)
++        {
++            // If baseFolder is null, use current directory
++            var root = string.IsNullOrWhiteSpace(baseFolder) ? Directory.GetCurrentDirectory() : baseFolder;
++            _dataFolder = Path.Combine(root, "data");
++            Directory.CreateDirectory(_dataFolder);
++
++            _jsonOptions = new JsonSerializerOptions
++            {
++                WriteIndented = true,
++                PropertyNameCaseInsensitive = true
++            };
++        }
++
++        private string GetPath(string fileName) => Path.Combine(_dataFolder, fileName);
++
++        public async Task<List<T>> ReadListAsync<T>(string fileName)
++        {
++            var path = GetPath(fileName);
++            await _ioLock.WaitAsync().ConfigureAwait(false);
++            try
++            {
++                if (!File.Exists(path))
++                {
++                    return new List<T>();
++                }
++
++                using var stream = File.OpenRead(path);
++                var data = await JsonSerializer.DeserializeAsync<List<T>>(stream, _jsonOptions).ConfigureAwait(false);
++                return data ?? new List<T>();
++            }
++            finally
++            {
++                _ioLock.Release();
++            }
++        }
++
++        public async Task WriteListAsync<T>(string fileName, List<T> items)
++        {
++            var path = GetPath(fileName);
++            await _ioLock.WaitAsync().ConfigureAwait(false);
++            try
++            {
++                using var stream = File.Create(path);
++                await JsonSerializer.SerializeAsync(stream, items, _jsonOptions).ConfigureAwait(false);
++                await stream.FlushAsync().ConfigureAwait(false);
++            }
++            finally
++            {
++                _ioLock.Release();
++            }
++        }
++    }
++}
++
+*** End Patch
+*** Begin Patch
+*** Add File: RCL.Core/Services/CustomerRepository.cs
++using RCL.Core.Models;
++using System;
++using System.Collections.Generic;
++using System.Linq;
++using System.Threading.Tasks;
++
++namespace RCL.Core.Services
++{
++    public class CustomerRepository
++    {
++        private const string FileName = "customers.json";
++        private readonly LocalDatabaseService _db;
++
++        public CustomerRepository(LocalDatabaseService db)
++        {
++            _db = db ?? throw new ArgumentNullException(nameof(db));
++        }
++
++        public async Task<List<Customer>> GetAllAsync()
++        {
++            return await _db.ReadListAsync<Customer>(FileName).ConfigureAwait(false);
++        }
++
++        public async Task<Customer?> GetByIdAsync(string id)
++        {
++            var list = await GetAllAsync().ConfigureAwait(false);
++            return list.FirstOrDefault(c => c.Id == id);
++        }
++
++        public async Task AddAsync(Customer customer)
++        {
++            var list = await GetAllAsync().ConfigureAwait(false);
++            list.Add(customer);
++            await _db.WriteListAsync(FileName, list).ConfigureAwait(false);
++        }
++
++        public async Task UpdateAsync(Customer customer)
++        {
++            var list = await GetAllAsync().ConfigureAwait(false);
++            var idx = list.FindIndex(c => c.Id == customer.Id);
++            if (idx >= 0)
++            {
++                list[idx] = customer;
++                await _db.WriteListAsync(FileName, list).ConfigureAwait(false);
++            }
++            else
++            {
++                throw new InvalidOperationException("Customer not found");
++            }
++        }
++
++        public async Task DeleteAsync(string id)
++        {
++            var list = await GetAllAsync().ConfigureAwait(false);
++            var removed = list.RemoveAll(c => c.Id == id);
++            if (removed > 0)
++            {
++                await _db.WriteListAsync(FileName, list).ConfigureAwait(false);
++            }
++        }
++    }
++}
++
+*** End Patch
+*** Begin Patch
+*** Add File: RCL.Core/Services/VisitRepository.cs
++using RCL.Core.Models;
++using System;
++using System.Collections.Generic;
++using System.Linq;
++using System.Threading.Tasks;
++
++namespace RCL.Core.Services
++{
++    public class VisitRepository
++    {
++        private const string FileName = "visits.json";
++        private readonly LocalDatabaseService _db;
++
++        public VisitRepository(LocalDatabaseService db)
++        {
++            _db = db ?? throw new ArgumentNullException(nameof(db));
++        }
++
++        public async Task<List<Visit>> GetAllAsync()
++        {
++            return await _db.ReadListAsync<Visit>(FileName).ConfigureAwait(false);
++        }
++
++        public async Task<List<Visit>> GetByCustomerIdAsync(string customerId)
++        {
++            var list = await GetAllAsync().ConfigureAwait(false);
++            return list.Where(v => v.CustomerId == customerId).ToList();
++        }
++
++        public async Task AddAsync(Visit visit)
++        {
++            var list = await GetAllAsync().ConfigureAwait(false);
++            list.Add(visit);
++            await _db.WriteListAsync(FileName, list).ConfigureAwait(false);
++        }
++    }
++}
++
+*** End Patch
+*** Begin Patch
+*** Add File: RCL.Core/Services/BusinessRepository.cs
++using RCL.Core.Models;
++using System;
++using System.Collections.Generic;
++using System.Linq;
++using System.Threading.Tasks;
++
++namespace RCL.Core.Services
++{
++    public class BusinessRepository
++    {
++        private const string FileName = "businesses.json";
++        private readonly LocalDatabaseService _db;
++
++        public BusinessRepository(LocalDatabaseService db)
++        {
++            _db = db ?? throw new ArgumentNullException(nameof(db));
++        }
++
++        public async Task<List<Business>> GetAllAsync()
++        {
++            return await _db.ReadListAsync<Business>(FileName).ConfigureAwait(false);
++        }
++
++        public async Task AddAsync(Business business)
++        {
++            var list = await GetAllAsync().ConfigureAwait(false);
++            list.Add(business);
++            await _db.WriteListAsync(FileName, list).ConfigureAwait(false);
++        }
++    }
++}
++
+*** End Patch
