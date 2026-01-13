@@ -1,8 +1,8 @@
-using System;
+﻿using System;
 
 namespace RCL.Core.Models
 {
-    public class Visit
+    public partial class Visit
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string CustomerId { get; set; } = string.Empty;
@@ -11,4 +11,5 @@ namespace RCL.Core.Models
         public decimal Amount { get; set; } = 0m; // optional: for spend-based rules
     }
 }
+
 

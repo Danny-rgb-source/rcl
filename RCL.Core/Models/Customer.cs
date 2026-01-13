@@ -1,10 +1,10 @@
-using System;
+﻿using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
 namespace RCL.Core.Models
 {
-    public class Customer : INotifyPropertyChanged
+    public partial class Customer : INotifyPropertyChanged
     {
         private string _id = Guid.NewGuid().ToString();
         private string _name = string.Empty;
@@ -61,4 +61,5 @@ namespace RCL.Core.Models
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propName));
     }
 }
+
 
