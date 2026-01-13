@@ -1,59 +1,114 @@
-using System;
+﻿using System;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Linq;
+using System.Threading.Tasks;
+using System.Windows.Input;
 using RCL.Core.Models;
 using RCL.Core.Services;
 
 namespace RCL.Win.ViewModels
 {
-    public class CustomerItem
+    public class MainViewModel : INotifyPropertyChanged
     {
-        public string Name { get; set; } = "";
-        public string Phone { get; set; } = "";
-        public int Visits { get; set; }
-        public DateTime Joined { get; set; }
-        public bool RewardEligible { get; set; }
-    }
+        private readonly CustomerRepository _customerRepo;
+        private readonly VisitRepository _visitRepo;
 
-    public class MainViewModel
-    {
-        private readonly LocalDatabaseService _db;
-        private readonly RewardRule _rule = RewardRule.Default();
+        public ObservableCollection<CustomerViewModel> Customers { get; } = new();
+        public ICommand AddCustomerCommand { get; }
+        public ICommand LogVisitCommand { get; }
+        public ICommand RefreshCommand { get; }
+        public ICommand OpenSettingsCommand { get; }
 
-        public ObservableCollection<CustomerItem> Customers { get; } = new ObservableCollection<CustomerItem>();
-
-        public MainViewModel(string dbPath)
+        private bool _isBusy;
+        public bool IsBusy
         {
-            _db = new LocalDatabaseService(dbPath);
-            _db.EnsureDemoSeed();
-            Refresh();
-        }
-
-        public void Refresh()
-        {
-            Customers.Clear();
-            foreach (var c in _db.GetCustomersWithVisits())
+            get => _isBusy;
+            private set
             {
-                Customers.Add(new CustomerItem {
-                    Name = c.Name,
-                    Phone = c.Phone,
-                    Visits = c.VisitCount,
-                    Joined = c.JoinedUtc.ToLocalTime(),
-                    RewardEligible = _rule.IsEligible(c.VisitCount)
-                });
+                if (_isBusy == value) return;
+                _isBusy = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsBusy)));
             }
         }
 
-        public void LogVisit(string name)
+        public MainViewModel(CustomerRepository customerRepo, VisitRepository visitRepo)
         {
-            _db.LogVisit(name);
-            Refresh();
+            _customerRepo = customerRepo ?? throw new ArgumentNullException(nameof(customerRepo));
+            _visitRepo = visitRepo ?? throw new ArgumentNullException(nameof(visitRepo));
+
+            AddCustomerCommand = new RelayCommand(async _ => await AddCustomerAsync());
+            LogVisitCommand = new RelayCommand(async param => await LogVisitAsync(param as CustomerViewModel));
+            RefreshCommand = new RelayCommand(async _ => await RefreshAsync());
+            OpenSettingsCommand = new RelayCommand(_ => OpenSettings());
+
+            // Fire-and-forget initial load
+            _ = RefreshAsync();
         }
 
-        public void AddOrUpdateCustomer(string name, string phone)
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        public async Task RefreshAsync()
         {
-            _db.AddOrUpdateCustomer(name, phone);
-            Refresh();
+            if (IsBusy) return;
+            IsBusy = true;
+            try
+            {
+                Customers.Clear();
+                var list = await _customerRepo.GetAllAsync().ConfigureAwait(false);
+                foreach (var c in list.OrderByDescending(x => x.LastVisitAt ?? x.CreatedAt))
+                {
+                    Customers.Add(new CustomerViewModel(c));
+                }
+            }
+            finally
+            {
+                IsBusy = false;
+            }
+        }
+
+        private async Task AddCustomerAsync()
+        {
+            // Open AddCustomer dialog via helper; returns CustomerViewModel or null
+            var vm = await Helpers.DialogHelper.ShowAddCustomerDialogAsync();
+            if (vm == null) return;
+
+            var model = vm.ToModel();
+            await _customerRepo.AddAsync(model).ConfigureAwait(false);
+            await RefreshAsync().ConfigureAwait(false);
+        }
+
+        private async Task LogVisitAsync(CustomerViewModel? customer)
+        {
+            if (customer == null) return;
+
+            var success = await Helpers.DialogHelper.ShowLogVisitDialogAsync(customer);
+            if (!success) return;
+
+            var visit = new Visit
+            {
+                CustomerId = customer.Id,
+                BusinessId = string.Empty,
+                VisitAt = DateTime.UtcNow,
+                Amount = 0m,
+                Notes = "Logged from UI"
+            };
+
+            await _visitRepo.AddAsync(visit).ConfigureAwait(false);
+            // update last visit
+            var model = await _customerRepo.GetByIdAsync(customer.Id).ConfigureAwait(false);
+            if (model != null)
+            {
+                model.LastVisitAt = DateTime.UtcNow;
+                await _customerRepo.UpdateAsync(model).ConfigureAwait(false);
+            }
+
+            await RefreshAsync().ConfigureAwait(false);
+        }
+
+        private void OpenSettings()
+        {
+            Helpers.DialogHelper.ShowSettingsDialog();
         }
     }
 }
-
