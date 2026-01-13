@@ -1,0 +1,24 @@
+using System.Windows;
+using RCL.Core.Models;
+
+namespace RCL.Win.Views
+{
+    public partial class LogVisitWindow : Window
+    {
+        private readonly string _customerName;
+        private int _currentVisits;
+        private readonly RewardRule _rule = RewardRule.Default();
+
+        public LogVisitWindow(string customerName, int currentVisits)
+        {
+            InitializeComponent();
+            _customerName = customerName;
+            _currentVisits = currentVisits;
+
+            string desc;
+            var eligible = _rule.EvaluateEligibility(_currentVisits, out desc);
+            _rule.Mode = RewardRule.RuleModeType.FixedVisits;
+        }
+    }
+}
+

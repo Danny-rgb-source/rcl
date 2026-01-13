@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- App type -->
+    <OutputType>WinExe</OutputType>
+
+    <!-- Target framework -->
+    <TargetFramework>net8.0-windows</TargetFramework>
+
+    <!-- WPF -->
+    <UseWPF>true</UseWPF>
+
+    <!-- Modern C# features -->
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- App identity -->
+    <AssemblyName>RCL.Win</AssemblyName>
+    <RootNamespace>RCL.Win</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Core business logic -->
+    <ProjectReference Include="..\RCL.Core\RCL.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+  </ItemGroup>
+</Project>
+
+
+

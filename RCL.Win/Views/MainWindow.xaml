@@ -1,0 +1,29 @@
+<Window x:Class="RCL.Win.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="RCL - Customer Loyalty System" Height="600" Width="900">
+    <DockPanel>
+        <StackPanel Orientation="Horizontal" DockPanel.Dock="Top" Margin="8">
+            <Button x:Name="LogVisitButton" Content="Log Visit" />
+            <Button x:Name="AddCustomerButton" Content="Add/Update Customer" />
+            <Button x:Name="RefreshButton" Content="Refresh" />
+            <Button x:Name="SettingsButton" Content="Settings" />
+            <TextBlock Text="Loaded customers:" Margin="16,0,4,0" VerticalAlignment="Center"/>
+            <TextBlock x:Name="LoadedCountText" VerticalAlignment="Center"/>
+        </StackPanel>
+
+        <DataGrid x:Name="CustomerGrid" DockPanel.Dock="Top" Margin="8" IsReadOnly="True" AutoGenerateColumns="False">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" />
+                <DataGridTextColumn Header="Phone" Binding="{Binding Phone}" Width="150" />
+                <DataGridTextColumn Header="Visits" Binding="{Binding Visits}" Width="100" />
+                <DataGridTextColumn Header="Reward?" Binding="{Binding RewardEligible}" Width="100" />
+                <DataGridTextColumn Header="Joined" Binding="{Binding Joined}" Width="200" />
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <StatusBar DockPanel.Dock="Bottom">
+            <StatusBarItem Content="Ready"/>
+        </StatusBar>
+    </DockPanel>
+</Window>
