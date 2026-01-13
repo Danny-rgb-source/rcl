@@ -9,7 +9,7 @@ using RCL.Core.Services;
 
 namespace RCL.Win.ViewModels
 {
-    public class MainViewModel : INotifyPropertyChanged
+    public partial class MainViewModel : INotifyPropertyChanged
     {
         private readonly CustomerRepository _customerRepo;
         private readonly VisitRepository _visitRepo;
@@ -112,3 +112,4 @@ namespace RCL.Win.ViewModels
         }
     }
 }
+
